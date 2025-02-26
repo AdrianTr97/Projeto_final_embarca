@@ -16,10 +16,9 @@
 #define JOYSTICK_Y_PIN 27  // GPIO para eixo Y
 #define JOYSTICK_PB 22 // GPIO para botão do Joystick
 #define Botao_A 5 // GPIO para botão A
-
 #define LEDB_PIN 13  //GPIO led azul, no eixo y
 #define LEDR_PIN 12  //GPIO led vermelho, no eixo x
-#define BUZZER_1 10 //Buzzer acionamento em niveis altissimos de poluicao do ar
+#define BUZZER_PIN 10 //Buzzer acionamento em niveis altissimos de poluicao do ar
 
 // Função para inicializar o PWM
 uint pwm_init_gpio(uint gpio, uint wrap) {
@@ -36,6 +35,23 @@ uint pwm_init_gpio(uint gpio, uint wrap) {
     // Habilita o PWM no slice
     pwm_set_enabled(slice_num, true);  
     return slice_num;  // Retorna o número do slice para uso posterior
+}
+
+// Função para configurar o PWM no pino do buzzer
+void setup_pwm_on_buzzer(uint pin) {
+  gpio_set_function(pin, GPIO_FUNC_PWM);  // Configurar o pino como saída de PWM
+  uint slice_num = pwm_gpio_to_slice_num(pin);  // Obter o número do slice PWM
+  pwm_set_wrap(slice_num, 255);  // Definir o valor máximo para o ciclo de trabalho
+  pwm_set_chan_level(slice_num, PWM_CHAN_A, 0);  // Inicializar com o PWM desligado
+  pwm_set_enabled(slice_num, true);  // Habilitar PWM no pino
+}
+
+// Função para gerar um tom
+void play_tone(uint pin, uint frequency) {
+  uint slice_num = pwm_gpio_to_slice_num(pin);  // Obter o número do slice PWM
+  uint period = 125000000 / frequency;  // Calcular o período do PWM para a frequência desejada
+  pwm_set_wrap(slice_num, period);  // Ajustar o período do PWM
+  pwm_set_chan_level(slice_num, PWM_CHAN_A, period * 3 / 4);  // Aumentar o ciclo de trabalho para 75%
 }
 
 //variaveis para a funcao gpio_irq_handler
@@ -80,14 +96,16 @@ void gpio_config(){
   gpio_set_dir(Botao_A, GPIO_IN);
   gpio_pull_up(Botao_A);
 
+  setup_pwm_on_buzzer(BUZZER_PIN);
+  
   // Para ser utilizado o modo BOOTSEL com botão B
   gpio_init(botaoB);
   gpio_set_dir(botaoB, GPIO_IN);
   gpio_pull_up(botaoB);
 
   // Ativa as interrupções nos botões para chamar gpio_callback()
-  gpio_set_irq_enabled_with_callback(Botao_A, GPIO_IRQ_EDGE_RISE, true, &gpio_irq_handler);
-  gpio_set_irq_enabled_with_callback(JOYSTICK_PB, GPIO_IRQ_EDGE_RISE, true, &gpio_irq_handler);
+  gpio_set_irq_enabled_with_callback(Botao_A, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true, &gpio_irq_handler);
+  gpio_set_irq_enabled_with_callback(JOYSTICK_PB, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true, &gpio_irq_handler);
   gpio_set_irq_enabled_with_callback(botaoB, GPIO_IRQ_EDGE_FALL, true, &gpio_irq_handler_B);
 }
 
@@ -137,7 +155,6 @@ int main(){
     uint pwm_wrap = 4096;  // Define o valor máximo para o contador do PWM (influencia o duty cycle)
     uint pwm_slice_x = pwm_init_gpio(LEDR_PIN, pwm_wrap);  // Inicializa o PWM no pino LEDR_PIN e retorna o número do slice, red eixo y (x varia), cima (+) e baixo (-)
     uint pwm_slice_y = pwm_init_gpio(LEDB_PIN, pwm_wrap);  // Inicializa o PWM no pino LEDB_PIN e retorna o número do slice, azul eixo x (y varia), esquerda(+) e direita(-)
-    //uint pwm_slice_g = pwm_init_gpio(LEDG_PIN, pwm_wrap);  // Inicializa o PWM no pino LEDG_PIN e retorna o número do slice ---
     //analogico no eixo y: cima (+) x = 4095, y = 2047, red = 100%, blue = 50% e baixo (-) x = 0, y = 2047, red =0%, blue = 50% 
     //eixo x: esquerda(+) x = 2047 , y = 0, red =50%, blue = 0% e direita(-) x = 2047, y = 4095, red =50%, blue = 100%
     //cores saindo eixo y: cima (+) = roxo,  baixo (-) = azul
@@ -185,9 +202,6 @@ int main(){
         pwm_set_gpio_level(LEDR_PIN, 0);
         pwm_set_gpio_level(LEDB_PIN, 0);
       }      
-      // Controle dos LEDs com PWM baseado no valor do ADC0 (VRX) e ADC1 (VRY)
-      //pwm_set_gpio_level(LEDR_PIN, adc_value_x);  // Ajusta o duty cycle do LED proporcional ao valor lido de VRX
-      //pwm_set_gpio_level(LEDB_PIN, adc_value_y);  // Ajusta o duty cycle do LED proporcional ao valor lido de VRY
 
       // Calcula o duty cycle em porcentagem para impressão
       float duty_cycle_x = (adc_value_x / 4095.0) * 100;  // Converte o valor lido do ADC em uma porcentagem do duty cycle, vermelho----------
@@ -203,8 +217,6 @@ int main(){
           last_print_time = current_time;  // Atualiza o tempo da última impressão-----------
       }
       //instrucoes display ssd1306
-
-      //cor = !cor;
       // Atualiza o conteúdo do display com as novas informações
 
       //ssd1306_fill(&ssd, false); // Limpa o display
@@ -263,8 +275,14 @@ int main(){
         ssd1306_draw_string(&ssd, "@@: ON", 6, 52); // Desenha a string especifica
       }
       if (ppm_x > 900 && ppm_y > 900) {
-        ssd1306_draw_string(&ssd, "ALERTA", 52, 115); // Desenha a string especifica
+        //ssd1306_draw_string(&ssd, "ALERTA", 54, 115); // Desenha a string especifica 
+        //o display SSD1306 tem um limite de caracteres que pode exibir ao mesmo tempo, por isso essa linha nao escreve
+        ssd1306_draw_string(&ssd, ";", 54, 115); // Desenha a caveira se os dois sensores estiverem acima de 900
+        play_tone(BUZZER_PIN, 1000);  // Tocar 1000 Hz
+      } else {
+        pwm_set_chan_level(pwm_gpio_to_slice_num(BUZZER_PIN), PWM_CHAN_A, 0);  // Desligar o buzzer
       }
+      
       // Atualiza o display
       ssd1306_send_data(&ssd);
 
