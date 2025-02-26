@@ -68,7 +68,14 @@
       "top": -51.4,
       "left": -153.6,
       "attrs": { "color": "green" }
-    }    
+    },
+    {
+      "type": "wokwi-buzzer",
+      "id": "bz1",
+      "top": -112.8,
+      "left": -228.6,
+      "attrs": { "volume": "0.1" }
+    }
   ],
   "connections": [
     [ "pico:GP0", "$serialMonitor:RX", "", [] ],
@@ -90,8 +97,9 @@
     [ "vcc1:VCC", "oled1:VCC", "red", [ "h76.8", "v48" ] ],
     [ "oled1:GND", "gnd1:GND", "black", [ "v-38.4", "h-57.6" ] ],
     [ "btn1:1.r", "pico:GND.1", "black", [ "v0" ] ],
-    [ "btn1:2.r", "pico:GP5", "#8f4814", [ "h29", "v19.4" ] ]
-    
+    [ "btn1:2.r", "pico:GP5", "#8f4814", [ "h29", "v19.4" ] ],
+    [ "bz1:2", "pico:GP10", "green", [ "v0" ] ],
+    [ "bz1:1", "pico:GND.3", "green", [ "v0" ] ]
   ],
   "dependencies": {}
 }
