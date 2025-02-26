@@ -119,8 +119,9 @@ int main(){
     bool led_estado = false;  // Flag para controlar o estado do LED (false = desligado, true = ligado), para o led verde
     bool pwm_enabled = true;  // Controle do PWM (se habilitado ou desabilitado)
     bool last_button_state = true;
-    bool fan_carv_20 = false, fan_carv_40 = false, fan_carv_60 = false, fan_carv_80 = false, fan_carv_100 = false;
     bool fan_hepa_20 = false, fan_hepa_40 = false, fan_hepa_60 = false, fan_hepa_80 = false, fan_hepa_100 = false;
+    bool fan_caim_20 = false, fan_caim_40 = false, fan_caim_60 = false, fan_caim_80 = false, fan_caim_100 = false; 
+    // CAIM = CARVAO ATIVADO IMPREGNADO COM METAL ou oxido metalico
     // Posição inicial do quadrado do display
     int y = 28;
     int x = 60;
@@ -231,7 +232,7 @@ int main(){
       }
       //instrucoes display ssd1306
       // Atualiza o conteúdo do display com as novas informações
-
+      
       //ssd1306_fill(&ssd, false); // Limpa o display
       ssd1306_fill(&ssd, !cor); // Limpa o display
       //ssd1306_rect(&ssd, 3, 3, 122, 60, true, false); // Desenha um retângulo externo
@@ -257,30 +258,30 @@ int main(){
       }
       ssd1306_draw_string(&ssd, str_x, 85, 5); // Desenha uma string (valor de poluicao ar)
       ssd1306_draw_string(&ssd, str_y, 85, 16); // Desenha uma string  (valor de nivel co) 
-      ssd1306_draw_string(&ssd, "Fan Carv: ", 6, 27); // Desenha a string especifica
-      ssd1306_rect(&ssd, 33, 78, 8, 3, cor, fan_carv_20); // Desenha o primeiro retângulo de Fan Carv menos a direita, 20%
-      ssd1306_rect(&ssd, 32, 87, 8, 4, cor, fan_carv_40); // Desenha o segundo retângulo de Fan Carv, entre o meio e o menos a direita, 40%
-      ssd1306_rect(&ssd, 31, 96, 8, 5, cor, fan_carv_60); // Desenha o terceiro retângulo de Fan Carv nom meio,60%
-      ssd1306_rect(&ssd, 30, 105, 8, 6, cor, fan_carv_80); // Desenha o quarto retângulo de Fan Carv, entre o meio e o mais a direita, 80%
-      ssd1306_rect(&ssd, 29, 114, 8, 7, cor, fan_carv_100); // Desenha o quinto retângulo de Fan Carv mais a direita, 100%
+      ssd1306_draw_string(&ssd, "Fan HEPA: ", 6, 27); // Desenha a string especifica
+      ssd1306_rect(&ssd, 33, 78, 8, 3, cor, fan_hepa_20); // Desenha o primeiro retângulo de Fan Carv menos a direita, 20%
+      ssd1306_rect(&ssd, 32, 87, 8, 4, cor, fan_hepa_40); // Desenha o segundo retângulo de Fan Carv, entre o meio e o menos a direita, 40%
+      ssd1306_rect(&ssd, 31, 96, 8, 5, cor, fan_hepa_60); // Desenha o terceiro retângulo de Fan Carv nom meio,60%
+      ssd1306_rect(&ssd, 30, 105, 8, 6, cor, fan_hepa_80); // Desenha o quarto retângulo de Fan Carv, entre o meio e o mais a direita, 80%
+      ssd1306_rect(&ssd, 29, 114, 8, 7, cor, fan_hepa_100); // Desenha o quinto retângulo de Fan Carv mais a direita, 100%
       // Configuração dos níveis do ventilador de carvão com base em ppm_x
-      if (ppm_x >= 200) fan_carv_20 = true; else fan_carv_20 = false;
-      if (ppm_x >= 400) fan_carv_40 = true; else fan_carv_40 = false;
-      if (ppm_x >= 600) fan_carv_60 = true; else fan_carv_60 = false;
-      if (ppm_x >= 800) fan_carv_80 = true; else fan_carv_80 = false;
-      if (ppm_x >= 1000) fan_carv_100 = true; else fan_carv_100 = false;
-      ssd1306_draw_string(&ssd, "Fan HEPA: ", 6, 38); // Desenha a string especifica
-      ssd1306_rect(&ssd, 42, 78, 8, 3, cor, fan_hepa_20); // Desenha o primeiro retângulo de Fan HEPA menos a direita, 20%
-      ssd1306_rect(&ssd, 41, 87, 8, 4, cor, fan_hepa_40); // Desenha o segundo retângulo de Fan HEPA, entre o meio e o menos a direita, 40%
-      ssd1306_rect(&ssd, 40, 96, 8, 5, cor, fan_hepa_60); // Desenha o terceiro retângulo de Fan HEPA nom meio,60%
-      ssd1306_rect(&ssd, 39, 105, 8, 6, cor, fan_hepa_80); // Desenha o quarto retângulo de Fan HEPA, entre o meio e o mais a direita, 80%
-      ssd1306_rect(&ssd, 38, 114, 8, 7, cor, fan_hepa_100); // Desenha o quinto retângulo de Fan HEPA mais a direita, 100%
+      if (ppm_x >= 200) fan_hepa_20 = true; else fan_hepa_20 = false;
+      if (ppm_x >= 400) fan_hepa_40 = true; else fan_hepa_40 = false;
+      if (ppm_x >= 600) fan_hepa_60 = true; else fan_hepa_60 = false;
+      if (ppm_x >= 800) fan_hepa_80 = true; else fan_hepa_80 = false;
+      if (ppm_x >= 1000) fan_hepa_100 = true; else fan_hepa_100 = false;
+      ssd1306_draw_string(&ssd, "Fan CAIM: ", 6, 38); // Desenha a string especifica
+      ssd1306_rect(&ssd, 42, 78, 8, 3, cor, fan_caim_20); // Desenha o primeiro retângulo de Fan HEPA menos a direita, 20%
+      ssd1306_rect(&ssd, 41, 87, 8, 4, cor, fan_caim_40); // Desenha o segundo retângulo de Fan HEPA, entre o meio e o menos a direita, 40%
+      ssd1306_rect(&ssd, 40, 96, 8, 5, cor, fan_caim_60); // Desenha o terceiro retângulo de Fan HEPA nom meio,60%
+      ssd1306_rect(&ssd, 39, 105, 8, 6, cor, fan_caim_80); // Desenha o quarto retângulo de Fan HEPA, entre o meio e o mais a direita, 80%
+      ssd1306_rect(&ssd, 38, 114, 8, 7, cor, fan_caim_100); // Desenha o quinto retângulo de Fan HEPA mais a direita, 100%
       // Configuração dos níveis do ventilador HEPA com base em ppm_y
-      if (ppm_y >= 200) fan_hepa_20 = true; else fan_hepa_20 = false;
-      if (ppm_y >= 400) fan_hepa_40 = true; else fan_hepa_40 = false;
-      if (ppm_y >= 600) fan_hepa_60 = true; else fan_hepa_60 = false;
-      if (ppm_y >= 800) fan_hepa_80 = true; else fan_hepa_80 = false;
-      if (ppm_y >= 1000) fan_hepa_100 = true; else fan_hepa_100 = false;
+      if (ppm_y >= 200) fan_caim_20 = true; else fan_caim_20 = false;
+      if (ppm_y >= 400) fan_caim_40 = true; else fan_caim_40 = false;
+      if (ppm_y >= 600) fan_caim_60 = true; else fan_caim_60 = false;
+      if (ppm_y >= 800) fan_caim_80 = true; else fan_caim_80 = false;
+      if (ppm_y >= 1000) fan_caim_100 = true; else fan_caim_100 = false;
       
       if (ppm_x < 100 && ppm_y < 100) {
         ssd1306_draw_string(&ssd, "@@: OFF", 6, 52); // Desenha a string especifica
@@ -306,7 +307,7 @@ int main(){
       //uint8_t height: A altura do retângulo (quantos pixels ele ocupará verticalmente).
       //bool value: Um valor booleano que determina se o retângulo será desenhado com pixels acesos (true) ou apagados (false).
       //bool fill: Um valor booleano que determina se o retângulo será preenchido ou apenas contornado.
-      
+    
 
     // Introduz um atraso de 100 milissegundos antes de repetir a leitura
     sleep_ms(100);  // Pausa o programa por 100ms para evitar leituras e impressões muito rápidas
