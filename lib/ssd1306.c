@@ -67,12 +67,21 @@ void ssd1306_send_data(ssd1306_t *ssd) {
     false
   );
 }
-
+//O display SSD1306 geralmente é organizado em uma matriz de pixels, onde cada byte representa 8 pixels verticais (em um esquema de "coluna x linha")
+//A resolução do display é 128x64 pixels, mas sua memória interna é organizada em 128 colunas e 8 páginas verticais. sendo na pratica 128x8
+//Ou seja, a memória é mapeada de maneira que cada página contém 8 pixels de altura e a tela tem 128 colunas.
+//128x8 para o armazenamento interno da memória do SSD1306, mas visualmente o display possui 128x64 pixels em sua resolução.
+//uint8_t x: Coordenada X do pixel (coluna), uint8_t y: Coordenada Y do pixel (linha).
+//bool value: Valor para definir o pixel. true acende o pixel e false apaga o pixel.
 void ssd1306_pixel(ssd1306_t *ssd, uint8_t x, uint8_t y, bool value) {
-  uint16_t index = (y >> 3) + (x << 3) + 1;
-  uint8_t pixel = (y & 0b111);
+  uint16_t index = (y >> 3) + (x << 3) + 1; //como dito na organização de memória cada byte armazena 8 pixels verticais (de 8 linhas), uma pagina
+  // A linha y é dividida por 8 (feito por y >> 3, deslocamento de 3 bits), para determinar a página do display correspondente
+  //x << 3 desloca a coordenada x para encontrar a coluna correta. creio que o +1 é para compensar o início do mapeamento de memória, dependendo da implementação.
+  uint8_t pixel = (y & 0b111); //0b111 é uma máscara binária que seleciona os 3 bits menos significativos do número. ja que 0b111 (00000111, em 8 bits) AND (&) a posicao 
+  //de y que resulta no número do pixel dentro de uma "página" de 8 pixels
+  //Quando y = 10, A coordenada de y é 10, em binario, y = 00001010, y & 0b111 irá resultar em 2, ou seja, o pixel esta na posicao 2 de sua pagina
   if (value)
-    ssd->ram_buffer[index] |= (1 << pixel);
+    ssd->ram_buffer[index] |= (1 << pixel); //->: Usado para acessar membros de uma estrutura através de um ponteiro, em vez de usar o operador . com uma variável de estrutura
   else
     ssd->ram_buffer[index] &= ~(1 << pixel);
 }
@@ -92,9 +101,13 @@ void ssd1306_fill(ssd1306_t *ssd, bool value) {
         }
     }
 }
-
-
-
+//ssd1306_t *ssd: Um ponteiro para a estrutura do display SSD1306, que contém o buffer de pixels.
+//uint8_t top: A coordenada Y do topo do retângulo (onde o retângulo começa verticalmente).
+//uint8_t left: A coordenada X da esquerda do retângulo (onde o retângulo começa horizontalmente).
+//uint8_t width: A largura do retângulo (quantos pixels ele ocupará horizontalmente).
+//uint8_t height: A altura do retângulo (quantos pixels ele ocupará verticalmente).
+//bool value: Um valor booleano que determina se o retângulo será desenhado com pixels acesos (true) ou apagados (false).
+//bool fill: Um valor booleano que determina se o retângulo será preenchido ou apenas contornado.
 void ssd1306_rect(ssd1306_t *ssd, uint8_t top, uint8_t left, uint8_t width, uint8_t height, bool value, bool fill) {
   for (uint8_t x = left; x < left + width; ++x) {
     ssd1306_pixel(ssd, x, top, value);
@@ -157,13 +170,33 @@ void ssd1306_vline(ssd1306_t *ssd, uint8_t x, uint8_t y0, uint8_t y1, bool value
 void ssd1306_draw_char(ssd1306_t *ssd, char c, uint8_t x, uint8_t y)
 {
   uint16_t index = 0;
-  char ver=c;
-  if (c >= 'A' && c <= 'Z')
+  char ver=c; //variavel extra para depuracao
+  if (c >= 'A' && c <= 'Z') //lógica para mapear os caracteres para a tabela de fontes, verifica se o caractere c está entre 'A' e 'Z', letras maiúsculas
   {
-    index = (c - 'A' + 11) * 8; // Para letras maiúsculas
+    index = (c - 'A' + 15) * 8; //calcula o índice index para encontrar os dados da fonte no array que contém os pixels dos caracteres.  
+    //O valor (c - 'A') converte a letra maiúscula em um número de 0 a 25 (por exemplo, 'A' vira 0, 'B' vira 1, ..., 'Z' vira 25).
+    // se a letra for C, 'C' - 'A' = 2, entao, index = (2 + 11) * 8 = 13 * 8 = 104
+    //os 14 caracteres anterios sao os numeros, simbolos especiais e o nothing, entao comeca no 13, *8 porque cada caractere ocupa 8 bytes em font.h
+  }else  if (c >= 'a' && c <= 'z')
+  {
+    index = (c - 'a' + 41) * 8; //
   }else  if (c >= '0' && c <= '9')
   {
     index = (c - '0' + 1) * 8; // Adiciona o deslocamento necessário
+  }else if (c == ':') 
+  {
+    index = 11 * 8;  // Índice do dois pontos
+  }
+  else if (c == '!') 
+  {
+    index = 12 * 8;  // indice de !
+  }else if (c == '@') // '@' represente o simbolo do fan(ventilador) 
+  {
+    index = 13 * 8;  
+  }
+  else if (c == ';') // ';' represente o simbolo de perigo(warning)
+  {
+    index = 14 * 8;  
   }
   
   for (uint8_t i = 0; i < 8; ++i)
@@ -178,7 +211,8 @@ void ssd1306_draw_char(ssd1306_t *ssd, char c, uint8_t x, uint8_t y)
 
 // Função para desenhar uma string
 void ssd1306_draw_string(ssd1306_t *ssd, const char *str, uint8_t x, uint8_t y)
-{
+{ //x: A coordenada horizontal (posição da coluna) onde o texto começará, x pode variar de 0 a 127, representando a posição horizontal no display. 
+  //y: A coordenada vertical (posição da linha) onde o texto será desenhado.
   while (*str)
   {
     ssd1306_draw_char(ssd, *str++, x, y);
