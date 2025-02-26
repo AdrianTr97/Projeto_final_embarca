@@ -16,7 +16,7 @@
 #define JOYSTICK_Y_PIN 27  // GPIO para eixo Y
 #define JOYSTICK_PB 22 // GPIO para botão do Joystick
 #define Botao_A 5 // GPIO para botão A
-#define LEDG_PIN 11  //GPIO led verde, acionado no clique do botao
+
 #define LEDB_PIN 13  //GPIO led azul, no eixo y
 #define LEDR_PIN 12  //GPIO led vermelho, no eixo x
 #define BUZZER_1 10 //Buzzer acionamento em niveis altissimos de poluicao do ar
@@ -36,11 +36,6 @@ uint pwm_init_gpio(uint gpio, uint wrap) {
     // Habilita o PWM no slice
     pwm_set_enabled(slice_num, true);  
     return slice_num;  // Retorna o número do slice para uso posterior
-}
-
-// Mapeamento do ADC (0-4095) para a resolução do display (0-120 para X e 0-56 para Y)
-int map_value(int value, int from_low, int from_high, int to_low, int to_high) {
-  return to_low + ((value - from_low) * (to_high - to_low)) / (from_high - from_low);
 }
 
 //variaveis para a funcao gpio_irq_handler
@@ -66,6 +61,14 @@ void gpio_irq_handler(uint gpio, uint32_t events){ // Função de interrupção 
       }
   }
 }
+
+//Trecho para modo BOOTSEL com botão B
+#include "pico/bootrom.h"
+#define botaoB 6
+void gpio_irq_handler_B(uint gpio, uint32_t events)
+{
+  reset_usb_boot(0, 0);
+}
 //funcao auxiliar
 void gpio_config(){
   //inicializa botao A e botao do analogico
@@ -77,9 +80,15 @@ void gpio_config(){
   gpio_set_dir(Botao_A, GPIO_IN);
   gpio_pull_up(Botao_A);
 
+  // Para ser utilizado o modo BOOTSEL com botão B
+  gpio_init(botaoB);
+  gpio_set_dir(botaoB, GPIO_IN);
+  gpio_pull_up(botaoB);
+
   // Ativa as interrupções nos botões para chamar gpio_callback()
   gpio_set_irq_enabled_with_callback(Botao_A, GPIO_IRQ_EDGE_RISE, true, &gpio_irq_handler);
   gpio_set_irq_enabled_with_callback(JOYSTICK_PB, GPIO_IRQ_EDGE_RISE, true, &gpio_irq_handler);
+  gpio_set_irq_enabled_with_callback(botaoB, GPIO_IRQ_EDGE_FALL, true, &gpio_irq_handler_B);
 }
 
 int main(){
@@ -92,6 +101,8 @@ int main(){
     bool led_estado = false;  // Flag para controlar o estado do LED (false = desligado, true = ligado), para o led verde
     bool pwm_enabled = true;  // Controle do PWM (se habilitado ou desabilitado)
     bool last_button_state = true;
+    bool fan_carv_20 = false, fan_carv_40 = false, fan_carv_60 = false, fan_carv_80 = false, fan_carv_100 = false;
+    bool fan_hepa_20 = false, fan_hepa_40 = false, fan_hepa_60 = false, fan_hepa_80 = false, fan_hepa_100 = false;
     // Posição inicial do quadrado do display
     int y = 28;
     int x = 60;
@@ -149,8 +160,14 @@ int main(){
       adc_value_y = adc_read(); // Lê o valor analógico do eixo Y, retornando um valor entre 0 e 4095---    
       //uint16_t adc_value_y = adc_read();  
       bool joy_pressed = !gpio_get(JOYSTICK_PB);
-      sprintf(str_x, "%d", adc_value_x);  // Converte o inteiro (valor de MQ135) em string
-      sprintf(str_y, "%d", adc_value_y);  // Converte o inteiro (valor de MQ7) em string
+      
+      // Converte os valores ADC para ppm (0-1000)
+      int ppm_x = (adc_value_x * 1000) / 4095;
+      int ppm_y = (adc_value_y * 1000) / 4095;
+      
+      // Converte os valores para string para exibição
+      sprintf(str_x, "%d", ppm_x);  // Converte o inteiro (valor de MQ135) em string
+      sprintf(str_y, "%d", ppm_y);  // Converte o inteiro (valor de MQ7) em string
 
       // Ativa ou desativa os LEDs PWM com o botão A
       bool button_state = gpio_get(Botao_A);
@@ -172,8 +189,6 @@ int main(){
       //pwm_set_gpio_level(LEDR_PIN, adc_value_x);  // Ajusta o duty cycle do LED proporcional ao valor lido de VRX
       //pwm_set_gpio_level(LEDB_PIN, adc_value_y);  // Ajusta o duty cycle do LED proporcional ao valor lido de VRY
 
-      pwm_set_gpio_level(LEDG_PIN, joy_pressed ? pwm_wrap : 0); // botao do joystick pressionado liga led verde
-
       // Calcula o duty cycle em porcentagem para impressão
       float duty_cycle_x = (adc_value_x / 4095.0) * 100;  // Converte o valor lido do ADC em uma porcentagem do duty cycle, vermelho----------
       float duty_cycle_y = (adc_value_y / 4095.0) * 100;  // Converte o valor lido do ADC em uma porcentagem do duty cycle, azul
@@ -188,35 +203,79 @@ int main(){
           last_print_time = current_time;  // Atualiza o tempo da última impressão-----------
       }
       //instrucoes display ssd1306
-      // Mapeia os valores do ADC para a posição do display
-      x = map_value(adc_value_y, 0, 4095, 0, 120); // 128 - 8 para manter dentro da tela
-      //y = map_value(adc_value_y, 0, 4095, 0, 56);  // 64 - 8 para manter dentro da tela
-      y = map_value(adc_value_x, 0, 4095, 56, 0);
-      //cor = !cor;
-      // Atualiza o conteúdo do display com animações
-      ssd1306_fill(&ssd, !cor); // Limpa o display (128x64)
-      ssd1306_rect(&ssd, 1, 1, 126, 63, cor, !cor); // Desenha o retângulo externo 
-      //ssd1306_line(&ssd, 3, 25, 123, 25, cor); // Desenha uma linha
-      //ssd1306_line(&ssd, 3, 37, 123, 37, cor); // Desenha uma linha   
-      //ssd1306_draw_string(&ssd, "CEPEDI   TIC37", 8, 6); // Desenha uma string
-      //ssd1306_draw_string(&ssd, "EMBARCATECH", 20, 16); // Desenha uma string
-      //ssd1306_draw_string(&ssd, "ADC   JOYSTICK", 10, 28); // Desenha uma string 
-      //ssd1306_draw_string(&ssd, "X    Y    PB", 20, 41); // Desenha uma string    
-      //ssd1306_line(&ssd, 44, 37, 44, 60, cor); // Desenha uma linha vertical         
-      //ssd1306_draw_string(&ssd, str_x, 8, 52); // Desenha uma string     
-      //ssd1306_line(&ssd, 84, 37, 84, 60, cor); // Desenha uma linha vertical      
-      //ssd1306_draw_string(&ssd, str_y, 49, 52); // Desenha uma string   
-      //ssd1306_rect(&ssd, 52, 90, 8, 8, cor, !gpio_get(JOYSTICK_PB)); // Desenha um retângulo, preenche o retangulo ao clicar no analogico
-      if (gpio_get(JOYSTICK_PB) == 0) {
-        // Desenha apenas o contorno do novo retângulo quando o joystick for pressionado
-        ssd1306_rect(&ssd, 3, 3, 122, 60, cor, !cor); 
-      }
-      //ssd1306_rect(&ssd, 52, 102, 8, 8, cor, !gpio_get(Botao_A)); // Desenha um retângulo          
-      // Desenha o quadrado no display (com os valores calculados para x e y)
-      ssd1306_rect(&ssd, y, x, 8, 8, cor, cor); // retângulo no meio do display
-      //ssd1306_rect(&ssd, 28, 60, 8, 8, cor, cor); // retangulo no meio do display
-      ssd1306_send_data(&ssd); // Atualiza o display
 
+      //cor = !cor;
+      // Atualiza o conteúdo do display com as novas informações
+
+      //ssd1306_fill(&ssd, false); // Limpa o display
+      ssd1306_fill(&ssd, !cor); // Limpa o display
+      //ssd1306_rect(&ssd, 3, 3, 122, 60, true, false); // Desenha um retângulo externo
+      ssd1306_rect(&ssd, 3, 3, 122, 60, cor, !cor); // Desenha um retângulo externo
+      //ssd1306_line(&ssd, 3, 25, 123, 25, true); // Desenha uma linha horizontal parte de cima
+      ssd1306_line(&ssd, 3, 25, 123, 25, cor); // Desenha uma linha horizontal parte de cima
+      ssd1306_line(&ssd, 3, 47, 123, 47, true); // Desenha uma linha horizontal meio (mudar coordenadas)
+
+      //void ssd1306_draw_string(ssd1306_t *ssd, const char *str, uint8_t x, uint8_t y)
+      //x: A coordenada horizontal (posição da coluna) onde o texto começará, x pode variar de 0 a 127, representando a posição horizontal no display. 
+      //y: A coordenada vertical (posição da linha) onde o texto será desenhado.
+
+      // Desenha as informações no display
+      ssd1306_draw_string(&ssd, "Poluicao: ", 6, 5); // Desenha a string especifica
+      //ssd1306_draw_string(&ssd, ";", 110, 5); // Desenha uma string com simbolo de caveira representado por ";"
+      if (ppm_x > 800) {
+        ssd1306_draw_string(&ssd, ";", 110, 5); // Desenha a caveira se ppm_x > 800
+      }
+      ssd1306_draw_string(&ssd, "Nivel CO: ", 6, 16); // Desenha a string especifica
+      //ssd1306_draw_string(&ssd, ";", 110, 16); // Desenha uma string com simbolo de caveira representado por ";"
+      if (ppm_y > 800) {
+        ssd1306_draw_string(&ssd, ";", 110, 16); // Desenha a caveira se ppm_y > 800
+      }
+      ssd1306_draw_string(&ssd, str_x, 85, 5); // Desenha uma string (valor de poluicao ar)
+      ssd1306_draw_string(&ssd, str_y, 85, 16); // Desenha uma string  (valor de nivel co) 
+      ssd1306_draw_string(&ssd, "Fan Carv: ", 6, 27); // Desenha a string especifica
+      ssd1306_rect(&ssd, 33, 78, 8, 3, cor, fan_carv_20); // Desenha o primeiro retângulo de Fan Carv menos a direita, 20%
+      ssd1306_rect(&ssd, 32, 87, 8, 4, cor, fan_carv_40); // Desenha o segundo retângulo de Fan Carv, entre o meio e o menos a direita, 40%
+      ssd1306_rect(&ssd, 31, 96, 8, 5, cor, fan_carv_60); // Desenha o terceiro retângulo de Fan Carv nom meio,60%
+      ssd1306_rect(&ssd, 30, 105, 8, 6, cor, fan_carv_80); // Desenha o quarto retângulo de Fan Carv, entre o meio e o mais a direita, 80%
+      ssd1306_rect(&ssd, 29, 114, 8, 7, cor, fan_carv_100); // Desenha o quinto retângulo de Fan Carv mais a direita, 100%
+      // Configuração dos níveis do ventilador de carvão com base em ppm_x
+      if (ppm_x >= 200) fan_carv_20 = true; else fan_carv_20 = false;
+      if (ppm_x >= 400) fan_carv_40 = true; else fan_carv_40 = false;
+      if (ppm_x >= 600) fan_carv_60 = true; else fan_carv_60 = false;
+      if (ppm_x >= 800) fan_carv_80 = true; else fan_carv_80 = false;
+      if (ppm_x >= 1000) fan_carv_100 = true; else fan_carv_100 = false;
+      ssd1306_draw_string(&ssd, "Fan HEPA: ", 6, 38); // Desenha a string especifica
+      ssd1306_rect(&ssd, 42, 78, 8, 3, cor, fan_hepa_20); // Desenha o primeiro retângulo de Fan HEPA menos a direita, 20%
+      ssd1306_rect(&ssd, 41, 87, 8, 4, cor, fan_hepa_40); // Desenha o segundo retângulo de Fan HEPA, entre o meio e o menos a direita, 40%
+      ssd1306_rect(&ssd, 40, 96, 8, 5, cor, fan_hepa_60); // Desenha o terceiro retângulo de Fan HEPA nom meio,60%
+      ssd1306_rect(&ssd, 39, 105, 8, 6, cor, fan_hepa_80); // Desenha o quarto retângulo de Fan HEPA, entre o meio e o mais a direita, 80%
+      ssd1306_rect(&ssd, 38, 114, 8, 7, cor, fan_hepa_100); // Desenha o quinto retângulo de Fan HEPA mais a direita, 100%
+      // Configuração dos níveis do ventilador HEPA com base em ppm_y
+      if (ppm_y >= 200) fan_hepa_20 = true; else fan_hepa_20 = false;
+      if (ppm_y >= 400) fan_hepa_40 = true; else fan_hepa_40 = false;
+      if (ppm_y >= 600) fan_hepa_60 = true; else fan_hepa_60 = false;
+      if (ppm_y >= 800) fan_hepa_80 = true; else fan_hepa_80 = false;
+      if (ppm_y >= 1000) fan_hepa_100 = true; else fan_hepa_100 = false;
+      
+      if (ppm_x < 100 && ppm_y < 100) {
+        ssd1306_draw_string(&ssd, "@@: OFF", 6, 52); // Desenha a string especifica
+      } else {
+        ssd1306_draw_string(&ssd, "@@: ON", 6, 52); // Desenha a string especifica
+      }
+      if (ppm_x > 900 && ppm_y > 900) {
+        ssd1306_draw_string(&ssd, "ALERTA", 52, 115); // Desenha a string especifica
+      }
+      // Atualiza o display
+      ssd1306_send_data(&ssd);
+
+      //void ssd1306_rect(ssd1306_t *ssd, uint8_t top, uint8_t left, uint8_t width, uint8_t height, bool value, bool fill)
+      //uint8_t top: A coordenada Y do topo do retângulo (onde o retângulo começa verticalmente).
+      //uint8_t left: A coordenada X da esquerda do retângulo (onde o retângulo começa horizontalmente).
+      //uint8_t width: A largura do retângulo (quantos pixels ele ocupará horizontalmente).
+      //uint8_t height: A altura do retângulo (quantos pixels ele ocupará verticalmente).
+      //bool value: Um valor booleano que determina se o retângulo será desenhado com pixels acesos (true) ou apagados (false).
+      //bool fill: Um valor booleano que determina se o retângulo será preenchido ou apenas contornado.
+      
 
     // Introduz um atraso de 100 milissegundos antes de repetir a leitura
     sleep_ms(100);  // Pausa o programa por 100ms para evitar leituras e impressões muito rápidas
