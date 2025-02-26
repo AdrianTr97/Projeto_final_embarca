@@ -181,6 +181,19 @@ int main(){
       // Converte os valores ADC para ppm (0-1000)
       int ppm_x = (adc_value_x * 1000) / 4095;
       int ppm_y = (adc_value_y * 1000) / 4095;
+
+      // Verifique se o valor de ppm_x ou ppm_y está abaixo ou igual a 50, que é considerado seguro
+      if (ppm_x <= 50) {
+        pwm_set_gpio_level(LEDR_PIN, 0);  // Desliga o LED vermelho (pino LEDR_PIN)
+      } else {
+        pwm_set_gpio_level(LEDR_PIN, adc_value_x);  // Ajusta o duty cycle do LED vermelho com base no valor de ppm_x
+      }
+
+      if (ppm_y <= 50) {
+        pwm_set_gpio_level(LEDB_PIN, 0);  // Desliga o LED azul (pino LEDB_PIN)
+      } else {
+        pwm_set_gpio_level(LEDB_PIN, adc_value_y);  // Ajusta o duty cycle do LED azul com base no valor de ppm_y
+      }
       
       // Converte os valores para string para exibição
       sprintf(str_x, "%d", ppm_x);  // Converte o inteiro (valor de MQ135) em string
