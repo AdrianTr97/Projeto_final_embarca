@@ -78,13 +78,6 @@ void gpio_irq_handler(uint gpio, uint32_t events){ // Função de interrupção 
   }
 }
 
-//Trecho para modo BOOTSEL com botão B
-#include "pico/bootrom.h"
-#define botaoB 6
-void gpio_irq_handler_B(uint gpio, uint32_t events)
-{
-  reset_usb_boot(0, 0);
-}
 //funcao auxiliar
 void gpio_config(){
   //inicializa botao A e botao do analogico
@@ -97,16 +90,10 @@ void gpio_config(){
   gpio_pull_up(Botao_A);
 
   setup_pwm_on_buzzer(BUZZER_PIN);
-  
-  // Para ser utilizado o modo BOOTSEL com botão B
-  gpio_init(botaoB);
-  gpio_set_dir(botaoB, GPIO_IN);
-  gpio_pull_up(botaoB);
 
   // Ativa as interrupções nos botões para chamar gpio_callback()
   gpio_set_irq_enabled_with_callback(Botao_A, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true, &gpio_irq_handler);
   gpio_set_irq_enabled_with_callback(JOYSTICK_PB, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true, &gpio_irq_handler);
-  gpio_set_irq_enabled_with_callback(botaoB, GPIO_IRQ_EDGE_FALL, true, &gpio_irq_handler_B);
 }
 
 int main(){
@@ -122,9 +109,7 @@ int main(){
     bool fan_hepa_20 = false, fan_hepa_40 = false, fan_hepa_60 = false, fan_hepa_80 = false, fan_hepa_100 = false;
     bool fan_caim_20 = false, fan_caim_40 = false, fan_caim_60 = false, fan_caim_80 = false, fan_caim_100 = false; 
     // CAIM = CARVAO ATIVADO IMPREGNADO COM METAL ou oxido metalico
-    // Posição inicial do quadrado do display
-    int y = 28;
-    int x = 60;
+
     bool cor = true; // Cor do quadrado (pode ser ajustada conforme necessário)
     
     // I2C Initialisation. Using it at 400Khz.
